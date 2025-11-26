@@ -1,0 +1,310 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum AuthProvider {
+  GOOGLE
+  FACEBOOK
+  PHONE
+}
+
+enum LikeEntityType {
+  VIDEO
+  COMMENT
+}
+
+enum CommentType {
+  TEXT
+  STICKER
+  TEXT_AND_STICKER
+}
+
+enum ReportEntityType {
+  VIDEO
+  COMMENT
+  USER
+}
+
+enum ReportReasonCode {
+  SPAM
+  ABUSE
+  NUDITY
+  HATE
+  OTHER
+}
+
+enum ModerationActionType {
+  BAN_VIDEO
+  UNBAN_VIDEO
+  BAN_COMMENT
+  UNBAN_COMMENT
+  BAN_USER
+  UNBAN_USER
+}
+
+enum UserBadgeType {
+  TOP_CREATOR
+  RISING_CREATOR
+  TOP_COMMENTER
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  REPLY
+  SHARE
+  FOLLOW
+  RANKING_CHANGE
+  VIDEO_BANNED
+  COMMENT_BANNED
+}
+
+enum NotificationEntityType {
+  VIDEO
+  COMMENT
+  USER
+  RANKING
+}
+
+model User {
+  id              String              @id @default(uuid())
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  email           String?             @unique
+  phoneNumber     String?             @unique
+  displayName     String?
+  bio             String?
+  isBanned        Boolean             @default(false)
+  role            UserRole            @default(USER)
+  followersCount  Int                 @default(0)
+  followingCount  Int                 @default(0)
+  videos          Video[]             @relation("UserVideos")
+  comments        Comment[]
+  likes           Like[]
+  notifications   Notification[]      @relation("UserNotifications")
+  sentNotifications Notification[]    @relation("NotificationActor")
+  authIdentities  AuthIdentity[]
+  userGodFollows  UserGodFollow[]
+  dailyStats      UserDailyStats[]
+  badges          UserBadge[]
+  followers       UserFollow[]        @relation("UserFollowingRelation")
+  followings      UserFollow[]        @relation("UserFollowerRelation")
+  reports         Report[]            @relation("Reporter")
+  moderationActions ModerationAction[] @relation("AdminActions")
+  viewEvents      VideoViewEvent[]
+  shareEvents     VideoShareEvent[]
+}
+
+model AuthIdentity {
+  id              String        @id @default(uuid())
+  userId          String
+  provider        AuthProvider
+  providerUserId  String
+  user            User          @relation(fields: [userId], references: [id])
+
+  @@unique([provider, providerUserId])
+}
+
+model God {
+  id            String           @id @default(uuid())
+  slug          String           @unique
+  imageUrl      String?
+  isActive      Boolean          @default(true)
+  followerCount Int              @default(0)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  translations  GodTranslation[]
+  videos        VideoGod[]
+  followers     UserGodFollow[]
+}
+
+model GodTranslation {
+  id            String   @id @default(uuid())
+  godId         String
+  languageCode  String
+  name          String
+  description   String?
+  god           God      @relation(fields: [godId], references: [id])
+
+  @@unique([godId, languageCode])
+}
+
+model UserGodFollow {
+  id      String @id @default(uuid())
+  userId  String
+  godId   String
+  user    User   @relation(fields: [userId], references: [id])
+  god     God    @relation(fields: [godId], references: [id])
+
+  @@unique([userId, godId])
+}
+
+model VideoGod {
+  id       String @id @default(uuid())
+  videoId  String
+  godId    String
+  video    Video  @relation(fields: [videoId], references: [id])
+  god      God    @relation(fields: [godId], references: [id])
+
+  @@unique([videoId, godId])
+}
+
+model Video {
+  id           String            @id @default(uuid())
+  uploaderId   String
+  caption      String?
+  videoUrl     String
+  thumbnailUrl String
+  durationSeconds Int             @default(0) // Duration of the video in seconds; max allowed is 60 for MVP.
+  isBanned     Boolean           @default(false)
+  banReason    String?
+  viewCount    Int               @default(0)
+  likeCount    Int               @default(0)
+  commentCount Int               @default(0)
+  shareCount   Int               @default(0)
+  reportCount  Int               @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  uploader     User              @relation("UserVideos", fields: [uploaderId], references: [id])
+  videoGods    VideoGod[]
+  comments     Comment[]
+  views        VideoViewEvent[]
+  shares       VideoShareEvent[]
+}
+
+model VideoViewEvent {
+  id        String   @id @default(uuid())
+  videoId   String
+  userId    String?
+  createdAt DateTime @default(now())
+  video     Video    @relation(fields: [videoId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model VideoShareEvent {
+  id        String   @id @default(uuid())
+  videoId   String
+  userId    String?
+  createdAt DateTime @default(now())
+  video     Video    @relation(fields: [videoId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model Like {
+  id         String         @id @default(uuid())
+  userId     String
+  entityType LikeEntityType
+  entityId   String
+  createdAt  DateTime       @default(now())
+  user       User           @relation(fields: [userId], references: [id])
+
+  @@unique([userId, entityType, entityId])
+}
+
+model Comment {
+  id              String        @id @default(uuid())
+  videoId         String
+  userId          String
+  parentCommentId String?
+  type            CommentType
+  text            String?
+  stickerId       String?
+  isBanned        Boolean       @default(false)
+  banReason       String?
+  likeCount       Int           @default(0)
+  replyCount      Int           @default(0)
+  reportCount     Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  video           Video         @relation(fields: [videoId], references: [id])
+  user            User          @relation(fields: [userId], references: [id])
+  parentComment   Comment?      @relation("CommentReplies", fields: [parentCommentId], references: [id])
+  replies         Comment[]     @relation("CommentReplies")
+}
+
+model Report {
+  id         String            @id @default(uuid())
+  reporterId String
+  entityType ReportEntityType
+  entityId   String
+  reasonCode ReportReasonCode
+  reasonText String?
+  createdAt  DateTime          @default(now())
+  reporter   User              @relation("Reporter", fields: [reporterId], references: [id])
+}
+
+model ModerationAction {
+  id               String                @id @default(uuid())
+  adminId          String
+  entityType       ReportEntityType
+  entityId         String
+  actionType       ModerationActionType
+  reason           String?
+  previousStateJson Json?
+  newStateJson     Json?
+  createdAt        DateTime             @default(now())
+  admin            User                 @relation("AdminActions", fields: [adminId], references: [id])
+}
+
+model UserDailyStats {
+  id               String   @id @default(uuid())
+  userId           String
+  date             DateTime
+  viewsReceived    Int      @default(0)
+  likesReceived    Int      @default(0)
+  commentsReceived Int      @default(0)
+  sharesReceived   Int      @default(0)
+  followersGained  Int      @default(0)
+  engagementScore  Int      @default(0)
+  user             User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+}
+
+model UserBadge {
+  id            String        @id @default(uuid())
+  userId        String
+  badgeType     UserBadgeType
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  user          User          @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id         String                   @id @default(uuid())
+  userId     String
+  actorId    String?
+  type       NotificationType
+  entityType NotificationEntityType?
+  entityId   String?
+  payloadJson Json?
+  isRead     Boolean                  @default(false)
+  readAt     DateTime?
+  createdAt  DateTime                 @default(now())
+  user       User                     @relation("UserNotifications", fields: [userId], references: [id])
+  actor      User?                    @relation("NotificationActor", fields: [actorId], references: [id])
+}
+
+model UserFollow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower    User     @relation("UserFollowerRelation", fields: [followerId], references: [id])
+  following   User     @relation("UserFollowingRelation", fields: [followingId], references: [id])
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+  @@index([followerId])
+}
