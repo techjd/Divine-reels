@@ -101,8 +101,6 @@ model User {
   followings      UserFollow[]        @relation("UserFollowerRelation")
   reports         Report[]            @relation("Reporter")
   moderationActions ModerationAction[] @relation("AdminActions")
-  viewEvents      VideoViewEvent[]
-  shareEvents     VideoShareEvent[]
 }
 
 model AuthIdentity {
@@ -160,44 +158,47 @@ model VideoGod {
 }
 
 model Video {
-  id           String            @id @default(uuid())
-  uploaderId   String
-  caption      String?
-  videoUrl     String
-  thumbnailUrl String
-  durationSeconds Int             @default(0) // Duration of the video in seconds; max allowed is 60 for MVP.
-  isBanned     Boolean           @default(false)
-  banReason    String?
-  viewCount    Int               @default(0)
-  likeCount    Int               @default(0)
-  commentCount Int               @default(0)
-  shareCount   Int               @default(0)
-  reportCount  Int               @default(0)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  uploader     User              @relation("UserVideos", fields: [uploaderId], references: [id])
-  videoGods    VideoGod[]
-  comments     Comment[]
-  views        VideoViewEvent[]
-  shares       VideoShareEvent[]
+  id              String      @id @default(uuid())
+  uploaderId      String
+  caption         String?
+  videoUrl        String
+  thumbnailUrl    String
+  durationSeconds Int         @default(0) // Duration of the video in seconds; max allowed is 60 for MVP.
+  isBanned        Boolean     @default(false)
+  banReason       String?
+  // Aggregated counters for UI/analytics; incremented via lightweight endpoints.
+  viewCount       Int         @default(0)
+  likeCount       Int         @default(0)
+  commentCount    Int         @default(0)
+  shareCount      Int         @default(0)
+  reportCount     Int         @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  uploader        User        @relation("UserVideos", fields: [uploaderId], references: [id])
+  videoGods       VideoGod[]
+  comments        Comment[]
+  views           VideoView[]
+  shares          VideoShare[]
 }
 
-model VideoViewEvent {
+model VideoView {
   id        String   @id @default(uuid())
   videoId   String
-  userId    String?
   createdAt DateTime @default(now())
+
   video     Video    @relation(fields: [videoId], references: [id])
-  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([videoId, createdAt])
 }
 
-model VideoShareEvent {
+model VideoShare {
   id        String   @id @default(uuid())
   videoId   String
-  userId    String?
   createdAt DateTime @default(now())
+
   video     Video    @relation(fields: [videoId], references: [id])
-  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([videoId, createdAt])
 }
 
 model Like {

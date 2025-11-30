@@ -100,6 +100,10 @@ router.post('/', asyncHandler(videoController.createVideo));
  *                         durationSeconds: 23
  *                         uploaderId: mock-user-id
  *                         createdAt: '2024-01-01T00:00:00.000Z'
+ *                         likeCount: 12
+ *                         commentCount: 3
+ *                         viewCount: 245
+ *                         shareCount: 4
  *                         gods:
  *                           - id: 123e4567-e89b-12d3-a456-426614174000
  *                             slug: shiva
@@ -107,6 +111,43 @@ router.post('/', asyncHandler(videoController.createVideo));
  *         description: Video not found
  */
 router.get('/feed', asyncHandler(videoController.getFeed));
+
+/**
+ * @openapi
+ * /videos/top/daily:
+ *   get:
+ *     summary: Get today’s top videos by likes, comments, views, and shares
+ *     description: Supports both homepage preview and paginated “view all” screens. Use metric to select which leaderboard and page/limit for pagination.
+ *     tags:
+ *       - Videos
+ *     parameters:
+ *       - in: query
+ *         name: metric
+ *         schema:
+ *           type: string
+ *           enum: [all, likes, comments, views, shares]
+ *         required: false
+ *         description: If omitted or 'all', returns all leaderboards. Otherwise returns only the specified one.
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         required: false
+ *         description: 1-based page index. Defaults to 1.
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *         required: false
+ *         description: Maximum number of videos to return per metric per page. Defaults to 10.
+ *     responses:
+ *       200:
+ *         description: Daily top videos fetched successfully.
+ */
+router.get('/top/daily', asyncHandler(videoController.getDailyTopVideos));
 
 /**
  * @openapi
@@ -147,5 +188,51 @@ router.get('/feed', asyncHandler(videoController.getFeed));
  *         description: Video not found
  */
 router.get('/:id', asyncHandler(videoController.getVideoById));
+
+/**
+ * @openapi
+ * /videos/{id}/view:
+ *   post:
+ *     summary: Register a video view
+ *     description: Increments the view counter for a video. The client should call this when a view is considered valid (e.g., after watch time threshold).
+ *     tags:
+ *       - Videos
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Video identifier
+ *     responses:
+ *       200:
+ *         description: View registered
+ *       404:
+ *         description: Video not found
+ */
+router.post('/:id/view', asyncHandler(videoController.registerView));
+
+/**
+ * @openapi
+ * /videos/{id}/share:
+ *   post:
+ *     summary: Register a video share
+ *     description: Increments the share counter for a video after a share is triggered by the client.
+ *     tags:
+ *       - Videos
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Video identifier
+ *     responses:
+ *       200:
+ *         description: Share registered
+ *       404:
+ *         description: Video not found
+ */
+router.post('/:id/share', asyncHandler(videoController.registerShare));
 
 export default router;
